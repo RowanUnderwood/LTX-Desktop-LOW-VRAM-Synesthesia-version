@@ -82,7 +82,7 @@ export function VideoEditor() {
   } = useProjects()
 
   const { activeLayout: kbLayout, isEditorOpen: isKbEditorOpen, setEditorOpen: setKbEditorOpen } = useKeyboardShortcuts()
-  const { forceApiGenerations } = useAppSettings()
+  const { shouldVideoGenerateWithLtxApi } = useAppSettings()
   const kbLayoutRef = useRef(kbLayout)
   kbLayoutRef.current = kbLayout
   const isKbEditorOpenRef = useRef(isKbEditorOpen)
@@ -1085,7 +1085,7 @@ export function VideoEditor() {
     isRegenerating, regenProgress, regenStatusMessage,
     regenCancel, regenReset, regenError,
     assetSavePath: currentProject?.assetSavePath,
-    forceApiGenerations,
+    shouldVideoGenerateWithLtxApi,
   })
   
   useEditorKeyboard({
@@ -4212,7 +4212,7 @@ export function VideoEditor() {
         regenProgress={regenProgress}
         regenReset={regenReset}
         handleI2vGenerate={handleI2vGenerate}
-        forceApiGenerations={forceApiGenerations}
+        shouldVideoGenerateWithLtxApi={shouldVideoGenerateWithLtxApi}
       />
       
       {subtitleTrackStyleIdx !== null && (

@@ -1,4 +1,4 @@
-import { AlertCircle, Check, Download, Info, KeyRound, Settings, Sliders, Sparkles, X, Zap } from 'lucide-react'
+import { AlertCircle, Check, Download, Film, Info, KeyRound, Settings, Sliders, Sparkles, X, Zap } from 'lucide-react'
 import React, { useEffect, useRef, useState } from 'react'
 import { Button } from './ui/button'
 import { useAppSettings, type AppSettings } from '../contexts/AppSettingsContext'
@@ -20,11 +20,12 @@ interface SettingsModalProps {
 type TabId = 'general' | 'apiKeys' | 'inference' | 'promptEnhancer' | 'about'
 
 export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProps) {
-  const { settings, updateSettings, saveLtxApiKey, saveFalApiKey, saveGeminiApiKey } = useAppSettings()
+  const { settings, updateSettings, saveLtxApiKey, saveFalApiKey, saveGeminiApiKey, forceApiGenerations } = useAppSettings()
   const onSettingsChange = (next: AppSettings) => updateSettings(next)
   const [activeTab, setActiveTab] = useState<TabId>('general')
   const [ltxApiKeyInput, setLtxApiKeyInput] = useState('')
   const ltxApiKeyInputRef = useRef<HTMLInputElement>(null)
+  const [focusLtxApiKeyInputOnTabChange, setFocusLtxApiKeyInputOnTabChange] = useState(false)
   const [falApiKeyInput, setFalApiKeyInput] = useState('')
   const falApiKeyInputRef = useRef<HTMLInputElement>(null)
   const [geminiApiKeyInput, setGeminiApiKeyInput] = useState('')
@@ -47,6 +48,19 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
       setActiveTab(initialTab)
     }
   }, [isOpen, initialTab])
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'apiKeys' || !focusLtxApiKeyInputOnTabChange) return
+
+    const frameId = window.requestAnimationFrame(() => {
+      ltxApiKeyInputRef.current?.focus()
+    })
+    setFocusLtxApiKeyInputOnTabChange(false)
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+    }
+  }, [activeTab, focusLtxApiKeyInputOnTabChange, isOpen])
 
   // Fetch app version when About tab is shown
   useEffect(() => {
@@ -146,6 +160,11 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
       ...settings,
       useLocalTextEncoder: !settings.useLocalTextEncoder,
     })
+  }
+
+  const openApiKeysAndFocusLtxInput = () => {
+    setActiveTab('apiKeys')
+    setFocusLtxApiKeyInputOnTabChange(true)
   }
 
   const handlePromptCacheSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -301,6 +320,55 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
         <div className="px-6 py-5 space-y-6 h-[60vh] overflow-y-auto">
           {activeTab === 'general' && (
             <>
+              {!forceApiGenerations && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Film className="h-4 w-4 text-blue-400" />
+                    <h3 className="text-sm font-semibold text-white">Videos Generation</h3>
+                  </div>
+
+                  <div
+                    className={`bg-zinc-800/50 rounded-lg p-4 border-2 transition-colors cursor-pointer ${
+                      settings.userPrefersLtxApiVideoGenerations ? 'border-blue-500' : 'border-transparent hover:border-zinc-600'
+                    }`}
+                    onClick={() => {
+                      if (!settings.hasLtxApiKey) {
+                        openApiKeysAndFocusLtxInput()
+                        return
+                      }
+                      onSettingsChange({
+                        ...settings,
+                        userPrefersLtxApiVideoGenerations: !settings.userPrefersLtxApiVideoGenerations,
+                      })
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-blue-400" />
+                          <span className="text-sm font-medium text-white">Generate With API</span>
+                        </div>
+                        <p className="text-xs text-zinc-400 mt-1">
+                          Use LTX API for video generation when an LTX API key is configured.
+                        </p>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        settings.userPrefersLtxApiVideoGenerations ? 'border-blue-500 bg-blue-500' : 'border-zinc-600'
+                      }`}>
+                        {settings.userPrefersLtxApiVideoGenerations && <Check className="h-3 w-3 text-white" />}
+                      </div>
+                    </div>
+
+                    {!settings.hasLtxApiKey && (
+                      <div className="mt-2 text-xs text-amber-400 flex items-center gap-1.5">
+                        <AlertCircle className="h-3 w-3" />
+                        API key required — configure it in the API Keys tab.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Text Encoding Section */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
@@ -323,7 +391,7 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                   onClick={() => {
                     if (!settings.useLocalTextEncoder) return
                     if (!settings.hasLtxApiKey) {
-                      setActiveTab('apiKeys')
+                      openApiKeysAndFocusLtxInput()
                       return
                     }
                     handleToggleLocalEncoder()

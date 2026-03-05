@@ -18,6 +18,7 @@ class TestGetSettings:
         assert data["useTorchCompile"] is False
         assert data["loadOnStartup"] is False
         assert data["hasLtxApiKey"] is False
+        assert data["userPrefersLtxApiVideoGenerations"] is False
         assert data["hasFalApiKey"] is False
         assert data["useLocalTextEncoder"] is False
         assert data["fastModel"] == {"useUpscaler": True}
@@ -114,6 +115,11 @@ class TestPostSettings:
         assert test_state.state.app_settings.gemini_api_key == "gemini-key-xyz"
         assert test_state.state.app_settings.fal_api_key == "fal-key-123"
 
+    def test_update_user_prefers_api_video_generations(self, client, test_state):
+        r = client.post("/api/settings", json={"userPrefersLtxApiVideoGenerations": True})
+        assert r.status_code == 200
+        assert test_state.state.app_settings.user_prefers_ltx_api_video_generations is True
+
     def test_empty_string_does_not_erase_key(self, client, test_state):
         test_state.state.app_settings.ltx_api_key = "real-key"
         test_state.state.app_settings.fal_api_key = "fal-key"
@@ -184,6 +190,14 @@ class TestSettingsPersistence:
         loaded = self._new_state(test_state, default_app_settings)
         assert loaded.state.app_settings.prompt_enhancer_enabled_t2v is False
         assert loaded.state.app_settings.prompt_enhancer_enabled_i2v is False
+
+    def test_user_prefers_api_video_generations_persists(self, client, test_state, default_app_settings):
+        r = client.post("/api/settings", json={"userPrefersLtxApiVideoGenerations": True})
+        assert r.status_code == 200
+        assert test_state.state.app_settings.user_prefers_ltx_api_video_generations is True
+
+        loaded = self._new_state(test_state, default_app_settings)
+        assert loaded.state.app_settings.user_prefers_ltx_api_video_generations is True
 
 
 class TestSettingsSchemaDrift:

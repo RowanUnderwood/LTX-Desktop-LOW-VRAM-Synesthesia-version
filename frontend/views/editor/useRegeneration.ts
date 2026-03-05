@@ -29,7 +29,7 @@ export interface UseRegenerationParams {
   regenReset: () => void
   regenError: string | null
   assetSavePath: string | undefined | null
-  forceApiGenerations: boolean
+  shouldVideoGenerateWithLtxApi: boolean
 }
 
 export function useRegeneration(params: UseRegenerationParams) {
@@ -43,7 +43,7 @@ export function useRegeneration(params: UseRegenerationParams) {
     regenCancel, regenReset,
     regenError,
     assetSavePath,
-    forceApiGenerations,
+    shouldVideoGenerateWithLtxApi,
   } = params
 
   // Track which asset/clip is being regenerated
@@ -74,9 +74,9 @@ export function useRegeneration(params: UseRegenerationParams) {
   })
 
   useEffect(() => {
-    if (!forceApiGenerations) return
+    if (!shouldVideoGenerateWithLtxApi) return
     setI2vSettings((prev) => sanitizeForcedApiVideoSettings(prev))
-  }, [forceApiGenerations])
+  }, [shouldVideoGenerateWithLtxApi])
 
   const handleI2vGenerate = useCallback(async () => {
     if (!i2vClipId || !i2vPrompt.trim() || !currentProjectId) return
@@ -98,14 +98,14 @@ export function useRegeneration(params: UseRegenerationParams) {
       ...i2vSettings,
       duration: Math.min(Math.max(1, Math.round(clip.duration)), i2vSettings.model === 'pro' ? 10 : 20),
     }
-    const settings = forceApiGenerations ? sanitizeForcedApiVideoSettings(rawSettings) : rawSettings
+    const settings = shouldVideoGenerateWithLtxApi ? sanitizeForcedApiVideoSettings(rawSettings) : rawSettings
 
     try {
       await regenGenerate(i2vPrompt, imagePath, settings)
     } catch (err) {
       logger.error(`I2V generation failed: ${err}`)
     }
-  }, [i2vClipId, i2vPrompt, i2vSettings, currentProjectId, clips, resolveClipSrc, regenGenerate])
+  }, [i2vClipId, i2vPrompt, i2vSettings, currentProjectId, clips, resolveClipSrc, regenGenerate, shouldVideoGenerateWithLtxApi])
 
   // When I2V generation completes, replace the image clip with a video clip
   useEffect(() => {
@@ -117,7 +117,7 @@ export function useRegeneration(params: UseRegenerationParams) {
 
       ;(async () => {
         const { path: finalPath, url: finalUrl } = await copyToAssetFolder(regenVideoPath || regenVideoUrl, regenVideoUrl, assetSavePath)
-        const savedI2vSettings = forceApiGenerations
+        const savedI2vSettings = shouldVideoGenerateWithLtxApi
           ? sanitizeForcedApiVideoSettings({
               ...i2vSettings,
               duration: Math.min(Math.max(1, Math.round(clip.duration)), i2vSettings.model === 'pro' ? 10 : 20),
@@ -167,7 +167,7 @@ export function useRegeneration(params: UseRegenerationParams) {
       regenReset()
     })()
 
-  }, [regenVideoUrl, isRegenerating, regenVideoPath, currentProjectId, clips, i2vClipId, i2vPrompt, i2vSettings, addAsset, setClips, regenReset, assetSavePath, forceApiGenerations])
+  }, [regenVideoUrl, isRegenerating, regenVideoPath, currentProjectId, clips, i2vClipId, i2vPrompt, i2vSettings, addAsset, setClips, regenReset, assetSavePath, shouldVideoGenerateWithLtxApi])
 
   // Clean up I2V state when generation fails
   useEffect(() => {
@@ -295,13 +295,13 @@ export function useRegeneration(params: UseRegenerationParams) {
         imageAspectRatio: params.imageAspectRatio || '16:9',
         imageSteps: params.imageSteps || 4,
       }
-      const videoSettings = forceApiGenerations
+      const videoSettings = shouldVideoGenerateWithLtxApi
         ? sanitizeForcedApiVideoSettings(rawVideoSettings)
         : rawVideoSettings
 
       regenGenerate(params.prompt, imagePath, videoSettings)
     }
-  }, [currentProjectId, isRegenerating, assets, clips, regenGenerate, regenGenerateImage, resolveClipSrc, updateAsset, forceApiGenerations])
+  }, [currentProjectId, isRegenerating, assets, clips, regenGenerate, regenGenerateImage, resolveClipSrc, updateAsset, shouldVideoGenerateWithLtxApi])
 
   const handleCancelRegeneration = useCallback(() => {
     regenCancel()

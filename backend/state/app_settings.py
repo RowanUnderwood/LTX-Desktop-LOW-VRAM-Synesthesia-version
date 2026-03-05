@@ -63,6 +63,7 @@ class AppSettings(SettingsBaseModel):
     use_torch_compile: bool = False
     load_on_startup: bool = False
     ltx_api_key: str = ""
+    user_prefers_ltx_api_video_generations: bool = False
     fal_api_key: str = ""
     use_local_text_encoder: bool = False
     fast_model: FastModelSettings = Field(default_factory=FastModelSettings)
@@ -133,6 +134,7 @@ class SettingsResponse(SettingsBaseModel):
     use_torch_compile: bool = False
     load_on_startup: bool = False
     has_ltx_api_key: bool = False
+    user_prefers_ltx_api_video_generations: bool = False
     has_fal_api_key: bool = False
     use_local_text_encoder: bool = False
     fast_model: FastModelSettings = Field(default_factory=FastModelSettings)
@@ -154,3 +156,10 @@ def to_settings_response(settings: AppSettings) -> SettingsResponse:
     data["has_fal_api_key"] = bool(fal_key)
     data["has_gemini_api_key"] = bool(gemini_key)
     return SettingsResponse.model_validate(data)
+
+
+def should_video_generate_with_ltx_api(*, force_api_generations: bool, settings: AppSettings) -> bool:
+    has_ltx_api_key = bool(settings.ltx_api_key.strip())
+    return force_api_generations or (
+        settings.user_prefers_ltx_api_video_generations and has_ltx_api_key
+    )

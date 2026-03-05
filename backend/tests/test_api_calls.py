@@ -234,3 +234,39 @@ class TestRetake:
         retake_call = fake_services.retake_pipeline.generate_calls[-1]
         assert retake_call["regenerate_video"] is True
         assert retake_call["regenerate_audio"] is False
+
+    def test_prefers_api_video_routes_retake_to_api(self, client, test_state, fake_services):
+        test_state.config.force_api_generations = False
+        test_state.state.app_settings.user_prefers_ltx_api_video_generations = True
+        test_state.state.app_settings.ltx_api_key = "test-key"
+        video_path = self._make_video(test_state)
+        test_state.ltx_api_client.retake_result = LTXRetakeResult(
+            video_bytes=b"\x00\x00\x00\x1cftypisom" + b"\x00" * 500,
+            result_payload=None,
+        )
+
+        r = client.post("/api/retake", json=self._base_payload(video_path))
+        assert r.status_code == 200
+        assert r.json()["status"] == "complete"
+        assert len(test_state.ltx_api_client.retake_calls) == 1
+        assert len(fake_services.retake_pipeline.generate_calls) == 0
+
+    def test_prefers_api_video_without_key_falls_back_to_local_retake(
+        self,
+        client,
+        test_state,
+        create_fake_model_files,
+        fake_services,
+    ):
+        create_fake_model_files(include_zit=False)
+        test_state.config.force_api_generations = False
+        test_state.state.app_settings.user_prefers_ltx_api_video_generations = True
+        test_state.state.app_settings.ltx_api_key = ""
+        test_state.state.app_settings.use_local_text_encoder = True
+
+        video_path = self._make_valid_video(test_state)
+        r = client.post("/api/retake", json=self._base_payload(video_path))
+        assert r.status_code == 200
+        assert r.json()["status"] == "complete"
+        assert len(test_state.ltx_api_client.retake_calls) == 0
+        assert len(fake_services.retake_pipeline.generate_calls) == 1

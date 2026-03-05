@@ -13,6 +13,7 @@ export interface AppSettings {
   useTorchCompile: boolean
   loadOnStartup: boolean
   hasLtxApiKey: boolean
+  userPrefersLtxApiVideoGenerations: boolean
   hasFalApiKey: boolean
   hasGeminiApiKey: boolean
   useLocalTextEncoder: boolean
@@ -29,6 +30,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   useTorchCompile: false,
   loadOnStartup: true,
   hasLtxApiKey: false,
+  userPrefersLtxApiVideoGenerations: false,
   hasFalApiKey: false,
   hasGeminiApiKey: false,
   useLocalTextEncoder: false,
@@ -53,6 +55,7 @@ interface AppSettingsContextValue {
   saveFalApiKey: (value: string) => Promise<void>
   saveGeminiApiKey: (value: string) => Promise<void>
   forceApiGenerations: boolean
+  shouldVideoGenerateWithLtxApi: boolean
 }
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null)
@@ -74,6 +77,7 @@ function normalizeAppSettings(data: Partial<AppSettings>): AppSettings {
     useTorchCompile: data.useTorchCompile ?? DEFAULT_APP_SETTINGS.useTorchCompile,
     loadOnStartup: data.loadOnStartup ?? DEFAULT_APP_SETTINGS.loadOnStartup,
     hasLtxApiKey: data.hasLtxApiKey ?? DEFAULT_APP_SETTINGS.hasLtxApiKey,
+    userPrefersLtxApiVideoGenerations: data.userPrefersLtxApiVideoGenerations ?? DEFAULT_APP_SETTINGS.userPrefersLtxApiVideoGenerations,
     hasFalApiKey: data.hasFalApiKey ?? DEFAULT_APP_SETTINGS.hasFalApiKey,
     hasGeminiApiKey: data.hasGeminiApiKey ?? DEFAULT_APP_SETTINGS.hasGeminiApiKey,
     useLocalTextEncoder: data.useLocalTextEncoder ?? DEFAULT_APP_SETTINGS.useLocalTextEncoder,
@@ -271,6 +275,9 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     await refreshSettings()
   }, [backendUrl, refreshSettings])
 
+  const shouldVideoGenerateWithLtxApi =
+    forceApiGenerations || (settings.userPrefersLtxApiVideoGenerations && settings.hasLtxApiKey)
+
   const contextValue = useMemo<AppSettingsContextValue>(
     () => ({
       settings,
@@ -282,8 +289,9 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       saveFalApiKey,
       saveGeminiApiKey,
       forceApiGenerations,
+      shouldVideoGenerateWithLtxApi,
     }),
-    [forceApiGenerations, isLoaded, refreshSettings, runtimePolicyLoaded, saveFalApiKey, saveGeminiApiKey, saveLtxApiKey, settings, updateSettings],
+    [forceApiGenerations, isLoaded, refreshSettings, runtimePolicyLoaded, saveFalApiKey, saveGeminiApiKey, saveLtxApiKey, settings, shouldVideoGenerateWithLtxApi, updateSettings],
   )
 
   return <AppSettingsContext.Provider value={contextValue}>{children}</AppSettingsContext.Provider>

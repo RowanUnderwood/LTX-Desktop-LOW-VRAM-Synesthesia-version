@@ -18,6 +18,7 @@ from runtime_config.runtime_config import RuntimeConfig
 from services.ltx_api_client.ltx_api_client import LTXAPIClientError
 from services.interfaces import LTXAPIClient
 from state.app_state_types import AppState
+from state.app_settings import should_video_generate_with_ltx_api
 
 
 class RetakeHandler(StateHandlerBase):
@@ -56,7 +57,10 @@ class RetakeHandler(StateHandlerBase):
         if not video_file.exists():
             raise HTTPError(400, f"Video file not found: {video_path}")
 
-        if self._config.force_api_generations:
+        if should_video_generate_with_ltx_api(
+            force_api_generations=self._config.force_api_generations,
+            settings=self.state.app_settings,
+        ):
             return self._run_api_retake(
                 video_file=video_file,
                 start_time=start_time,

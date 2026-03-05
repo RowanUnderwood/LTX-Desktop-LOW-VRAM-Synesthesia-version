@@ -17,7 +17,7 @@ interface I2vGenerationModalProps {
   regenProgress: number
   regenReset: () => void
   handleI2vGenerate: () => void
-  forceApiGenerations: boolean
+  shouldVideoGenerateWithLtxApi: boolean
 }
 
 export function I2vGenerationModal({
@@ -34,7 +34,7 @@ export function I2vGenerationModal({
   regenProgress,
   regenReset,
   handleI2vGenerate,
-  forceApiGenerations,
+  shouldVideoGenerateWithLtxApi,
 }: I2vGenerationModalProps) {
   if (!i2vClipId) return null
 
@@ -102,7 +102,7 @@ export function I2vGenerationModal({
                 onSettingsChange={setI2vSettings}
                 disabled={isRegenerating}
                 mode="image-to-video"
-                forceApiGenerations={forceApiGenerations}
+                forceApiGenerations={shouldVideoGenerateWithLtxApi}
               />
             </div>
           </div>

@@ -34,6 +34,7 @@ from services.interfaces import (
     VideoPipelineModelType,
 )
 from state.app_state_types import AppState
+from state.app_settings import should_video_generate_with_ltx_api
 
 if TYPE_CHECKING:
     from runtime_config.runtime_config import RuntimeConfig
@@ -85,7 +86,10 @@ class VideoGenerationHandler(StateHandlerBase):
         self._default_negative_prompt = default_negative_prompt
 
     def generate(self, req: GenerateVideoRequest) -> GenerateVideoResponse:
-        if self._config.force_api_generations:
+        if should_video_generate_with_ltx_api(
+            force_api_generations=self._config.force_api_generations,
+            settings=self.state.app_settings,
+        ):
             return self._generate_forced_api(req)
 
         if self._generation.is_generation_running():

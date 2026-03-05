@@ -258,6 +258,58 @@ class TestA2VGenerate:
         assert call["model"] == "ltx-2-3-pro"
         assert call["resolution"] == "1920x1080"
 
+    def test_a2v_prefers_api_routes_to_ltx_api(self, client, test_state, fake_services, tmp_path):
+        test_state.config.force_api_generations = False
+        test_state.state.app_settings.user_prefers_ltx_api_video_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+        audio_file = tmp_path / "test_audio.wav"
+        _write_test_wav(audio_file)
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A music video",
+                "resolution": "1080p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "50",
+                "audioPath": str(audio_file),
+            },
+        )
+
+        assert r.status_code == 200
+        assert r.json()["status"] == "complete"
+        assert len(fake_services.ltx_api_client.upload_file_calls) == 1
+        assert fake_services.ltx_api_client.upload_file_calls[0]["file_path"] == str(audio_file)
+        assert len(fake_services.ltx_api_client.audio_to_video_calls) == 1
+        assert len(fake_services.a2v_pipeline.generate_calls) == 0
+
+    def test_a2v_prefers_api_without_key_falls_back_to_local(self, client, test_state, fake_services, create_fake_model_files, tmp_path):
+        test_state.config.force_api_generations = False
+        test_state.state.app_settings.user_prefers_ltx_api_video_generations = True
+        test_state.state.app_settings.ltx_api_key = ""
+        _enable_local_text_encoding(test_state)
+        create_fake_model_files()
+        audio_file = tmp_path / "test_audio.wav"
+        _write_test_wav(audio_file)
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A music video",
+                "resolution": "540p",
+                "model": "fast",
+                "duration": "2",
+                "fps": "24",
+                "audioPath": str(audio_file),
+            },
+        )
+
+        assert r.status_code == 200
+        assert r.json()["status"] == "complete"
+        assert len(fake_services.ltx_api_client.audio_to_video_calls) == 0
+        assert len(fake_services.a2v_pipeline.generate_calls) == 1
+
     def test_a2v_forced_api_routes_to_ltx_api_with_audio_and_image(
         self, client, test_state, fake_services, make_test_image, tmp_path
     ):
@@ -386,6 +438,43 @@ class TestA2VGenerate:
 
 
 class TestForcedApiGenerate:
+    def test_prefers_api_video_routes_to_ltx_api(self, client, test_state, fake_services):
+        test_state.config.force_api_generations = False
+        test_state.state.app_settings.user_prefers_ltx_api_video_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A mountain lake",
+                "resolution": "1080p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "50",
+                "audio": "true",
+                "cameraMotion": "dolly_in",
+            },
+        )
+
+        assert r.status_code == 200
+        assert r.json()["status"] == "complete"
+        assert len(fake_services.ltx_api_client.text_to_video_calls) == 1
+        assert len(fake_services.fast_native_video_pipeline.generate_calls) == 0
+
+    def test_prefers_api_video_without_key_falls_back_to_local(self, client, test_state, fake_services, create_fake_model_files):
+        test_state.config.force_api_generations = False
+        test_state.state.app_settings.user_prefers_ltx_api_video_generations = True
+        test_state.state.app_settings.ltx_api_key = ""
+        _enable_local_text_encoding(test_state)
+        create_fake_model_files()
+
+        r = client.post("/api/generate", json=_T2V_JSON)
+
+        assert r.status_code == 200
+        assert r.json()["status"] == "complete"
+        assert len(fake_services.ltx_api_client.text_to_video_calls) == 0
+        assert len(fake_services.fast_native_video_pipeline.generate_calls) == 1
+
     def test_t2v_routes_to_ltx_api(self, client, test_state, fake_services):
         test_state.config.force_api_generations = True
         test_state.state.app_settings.ltx_api_key = "api-key"
