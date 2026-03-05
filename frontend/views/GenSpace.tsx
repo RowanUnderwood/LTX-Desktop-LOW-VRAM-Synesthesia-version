@@ -30,13 +30,15 @@ function AssetCard({
   onPlay,
   onDragStart,
   onCreateVideo,
+  onRetake,
   onToggleFavorite
-}: { 
+}: {
   asset: Asset
   onDelete: () => void
   onPlay: () => void
   onDragStart: (e: React.DragEvent, asset: Asset) => void
   onCreateVideo?: (asset: Asset) => void
+  onRetake?: (asset: Asset) => void
   onToggleFavorite?: () => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -135,6 +137,15 @@ function AssetCard({
                   Create video
                 </button>
               </>
+            )}
+            {asset.type === 'video' && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRetake?.(asset) }}
+                className="px-2.5 py-1.5 rounded-lg bg-black/40 backdrop-blur-md text-white hover:bg-black/60 transition-colors flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
+              >
+                <Scissors className="h-3 w-3" />
+                Retake
+              </button>
             )}
           </div>
           
@@ -1140,6 +1151,18 @@ export function GenSpace() {
     setPrompt(`${imageAsset.prompt || 'The scene comes to life...'}`)
   }
 
+  const handleRetake = (videoAsset: Asset) => {
+    setMode('retake')
+    setPrompt('')
+    setActiveRetakeSource(null)
+    setRetakeInitial({
+      videoUrl: videoAsset.url,
+      videoPath: videoAsset.path,
+      duration: videoAsset.duration,
+    })
+    setRetakePanelKey((prev) => prev + 1)
+  }
+
   const isRetakeMode = mode === 'retake'
   const canSubmit = isRetakeMode
     ? retakeInput.ready && !!retakeInput.videoPath && !isRetaking
@@ -1315,6 +1338,7 @@ export function GenSpace() {
                   onPlay={() => setSelectedAsset(asset)}
                   onDragStart={handleDragStart}
                   onCreateVideo={handleCreateVideo}
+                  onRetake={handleRetake}
                   onToggleFavorite={() => currentProjectId && toggleFavorite(currentProjectId, asset.id)}
                 />
               ))}
