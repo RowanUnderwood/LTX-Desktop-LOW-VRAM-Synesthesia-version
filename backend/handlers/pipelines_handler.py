@@ -116,17 +116,33 @@ class PipelinesHandler(StateHandlerBase):
             logger.warning("Failed to compile transformer: %s", exc, exc_info=True)
         return state
 
-    def _create_video_pipeline(self, model_type: VideoPipelineModelType) -> VideoPipelineState:
+   def _create_video_pipeline(self, model_type: VideoPipelineModelType) -> VideoPipelineState:
         gemma_root = self._text_handler.resolve_gemma_root()
 
-        checkpoint_path = str(resolve_model_path(self.models_dir, self.config.model_download_specs,"checkpoint"))
-        upsampler_path = str(resolve_model_path(self.models_dir, self.config.model_download_specs,"upsampler"))
+        checkpoint_path = str(resolve_model_path(self.models_dir, self.config.model_download_specs, "checkpoint"))
+        upsampler_path = str(resolve_model_path(self.models_dir, self.config.model_download_specs, "upsampler"))
+
+        settings = self.state.app_settings
+
+        # Resolve transformer device — use per-setting override if set,
+        # otherwise fall back to RuntimeConfig.transformer_device.
+        transformer_device = self.config.transformer_device
+        if settings.transformer_device:
+            try:
+                transformer_device = torch.device(settings.transformer_device)
+            except Exception:
+                pass
 
         pipeline = self._fast_video_pipeline_class.create(
             checkpoint_path,
             gemma_root,
             upsampler_path,
             self.config.device,
+            transformer_device=transformer_device,
+            block_swap_blocks_on_gpu=settings.block_swap_blocks_on_gpu,
+            attention_tile_size=settings.attention_tile_size,
+            use_fp8_transformer=settings.use_fp8_transformer,
+            gguf_transformer_path=settings.gguf_transformer_path,
         )
 
         state = VideoPipelineState(
