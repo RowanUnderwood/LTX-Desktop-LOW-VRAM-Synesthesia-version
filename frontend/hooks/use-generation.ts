@@ -24,11 +24,23 @@ interface GenerationProgress {
   totalSteps: number | null
 }
 
+export interface GenerationSuccessInfo {
+  prompt: string
+  negativePrompt: string
+  settings: GenerationSettings
+  seedUsed: number | null
+  videoPath: string | null
+}
+
 interface UseGenerationReturn extends GenerationState {
-  generate: (prompt: string, imagePath: string | null, settings: GenerationSettings, audioPath?: string | null) => Promise<void>
+  generate: (prompt: string, imagePath: string | null, settings: GenerationSettings, audioPath?: string | null, negativePrompt?: string) => Promise<void>
   generateImage: (prompt: string, settings: GenerationSettings) => Promise<void>
   cancel: () => void
   reset: () => void
+}
+
+interface UseGenerationOptions {
+  onGenerationSuccess?: (info: GenerationSuccessInfo) => void
 }
 
 const IMAGE_SHORT_SIDE_BY_RESOLUTION: Record<string, number> = {
@@ -89,7 +101,8 @@ function getPhaseMessage(phase: string): string {
   }
 }
 
-export function useGeneration(): UseGenerationReturn {
+export function useGeneration(options: UseGenerationOptions = {}): UseGenerationReturn {
+  const { onGenerationSuccess } = options
   const { settings: appSettings, forceApiGenerations, refreshSettings } = useAppSettings()
   const [state, setState] = useState<GenerationState>({
     isGenerating: false,
@@ -111,6 +124,7 @@ export function useGeneration(): UseGenerationReturn {
     imagePath: string | null,
     settings: GenerationSettings,
     audioPath?: string | null,
+    negativePrompt: string = '',
   ) => {
     const statusMsg = settings.model === 'pro'
       ? 'Loading Pro model & generating...'
@@ -222,7 +236,7 @@ export function useGeneration(): UseGenerationReturn {
         // Convert Windows path to proper file:// URL
         const videoPathNormalized = result.video_path.replace(/\\/g, '/')
         const fileUrl = videoPathNormalized.startsWith('/') ? `file://${videoPathNormalized}` : `file:///${videoPathNormalized}`
-        
+
         setState({
           isGenerating: false,
           progress: 100,
@@ -234,6 +248,14 @@ export function useGeneration(): UseGenerationReturn {
           imageUrls: [],
           imagePaths: [],
           error: null,
+        })
+
+        onGenerationSuccess?.({
+          prompt,
+          negativePrompt,
+          settings,
+          seedUsed: result.seed_used ?? null,
+          videoPath: result.video_path,
         })
       } else if (result.status === 'cancelled') {
         setState(prev => ({
@@ -265,7 +287,7 @@ export function useGeneration(): UseGenerationReturn {
         clearInterval(progressInterval)
       }
     }
-  }, [])
+  }, [onGenerationSuccess])
 
   const cancel = useCallback(async () => {
     // Abort the fetch request

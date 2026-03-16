@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import tempfile
@@ -139,8 +140,24 @@ class VideoGenerationHandler(StateHandlerBase):
                 negative_prompt=req.negativePrompt,
             )
 
+            self._write_sidecar(
+                video_path=output_path,
+                prompt=req.prompt,
+                negative_prompt=req.negativePrompt,
+                resolution=resolution,
+                width=width,
+                height=height,
+                num_frames=num_frames,
+                fps=fps,
+                duration=duration,
+                aspect_ratio=req.aspectRatio,
+                camera_motion=req.cameraMotion,
+                model=req.model,
+                seed=seed,
+            )
+
             self._generation.complete_generation(output_path)
-            return GenerateVideoResponse(status="complete", video_path=output_path)
+            return GenerateVideoResponse(status="complete", video_path=output_path, seed_used=seed)
 
         except Exception as e:
             self._generation.fail_generation(str(e))
@@ -374,6 +391,48 @@ class VideoGenerationHandler(StateHandlerBase):
     def _make_output_path(self) -> Path:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return self.config.outputs_dir / f"ltx2_video_{timestamp}_{self._make_generation_id()}.mp4"
+
+    def _write_sidecar(
+        self,
+        video_path: str,
+        prompt: str,
+        negative_prompt: str,
+        resolution: str,
+        width: int,
+        height: int,
+        num_frames: int,
+        fps: int,
+        duration: int,
+        aspect_ratio: str,
+        camera_motion: str,
+        model: str,
+        seed: int,
+    ) -> None:
+        settings = self.state.app_settings
+        sidecar = {
+            "timestamp": datetime.now().isoformat(),
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "model": model,
+            "resolution": resolution,
+            "width": width,
+            "height": height,
+            "num_frames": num_frames,
+            "duration_seconds": duration,
+            "fps": fps,
+            "aspect_ratio": aspect_ratio,
+            "camera_motion": camera_motion,
+            "seed": seed,
+            "block_swap_blocks_on_gpu": settings.block_swap_blocks_on_gpu,
+            "use_fp8_transformer": settings.use_fp8_transformer,
+            "attention_tile_size": settings.attention_tile_size,
+            "use_multi_gpu": settings.use_multi_gpu,
+        }
+        sidecar_path = Path(video_path).with_suffix(".json")
+        try:
+            sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+        except Exception as exc:
+            logger.warning("Failed to write sidecar metadata: %s", exc)
 
     def _generate_forced_api(self, req: GenerateVideoRequest) -> GenerateVideoResponse:
         if self._generation.is_generation_running():

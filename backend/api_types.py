@@ -167,6 +167,7 @@ class SuggestGapPromptResponse(BaseModel):
 class GenerateVideoResponse(BaseModel):
     status: str
     video_path: str | None = None
+    seed_used: int | None = None
 
 
 class GenerateImageResponse(BaseModel):

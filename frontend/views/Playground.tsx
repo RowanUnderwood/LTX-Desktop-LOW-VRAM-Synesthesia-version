@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { Sparkles, Trash2, Square, ImageIcon, ArrowLeft, Scissors } from 'lucide-react'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { Sparkles, Trash2, Square, ImageIcon, ArrowLeft, Scissors, History, X } from 'lucide-react'
 import { logger } from '../lib/logger'
 import { ImageUploader } from '../components/ImageUploader'
 import { AudioUploader } from '../components/AudioUploader'
@@ -21,6 +21,7 @@ import { fileUrlToPath } from '../lib/url-to-path'
 import { sanitizeForcedApiVideoSettings } from '../lib/api-video-options'
 import { RetakePanel } from '../components/RetakePanel'
 import { ICLoraPanel, CONDITIONING_TYPES, type ICLoraConditioningType } from '../components/ICLoraPanel'
+import { useGenerationHistory, type HistoryEntry } from '../hooks/use-generation-history'
 
 const DEFAULT_SETTINGS: GenerationSettings = {
   model: 'fast',
@@ -44,6 +45,9 @@ export function Playground() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [selectedAudio, setSelectedAudio] = useState<string | null>(null)
   const [settings, setSettings] = useState<GenerationSettings>(() => ({ ...DEFAULT_SETTINGS }))
+  const [showHistory, setShowHistory] = useState(false)
+  const { push: pushHistory, getAll: getHistory, remove: removeHistory } = useGenerationHistory()
+  const historyEntries = useMemo(() => (showHistory ? getHistory() : []), [showHistory, getHistory])
 
   const { status, processStatus } = useBackend()
 
@@ -74,19 +78,29 @@ export function Playground() {
   const handleModeChange = (newMode: GenerationMode) => {
     setMode(newMode)
   }
-  const { 
-    isGenerating, 
-    progress, 
-    statusMessage, 
+  const {
+    isGenerating,
+    progress,
+    statusMessage,
     videoUrl,
     videoPath,
-    imageUrl, 
+    imageUrl,
     error: generationError,
     generate,
     generateImage,
     cancel,
     reset,
-  } = useGeneration()
+  } = useGeneration({
+    onGenerationSuccess: (info) => {
+      pushHistory({
+        prompt: info.prompt,
+        negativePrompt: info.negativePrompt,
+        settings: info.settings,
+        seedUsed: info.seedUsed,
+        videoPath: info.videoPath,
+      })
+    },
+  })
 
   const {
     submitRetake,
@@ -213,6 +227,12 @@ export function Playground() {
     resetRetake()
     resetIcLora()
     reset()
+  }
+
+  const restoreFromHistory = (entry: HistoryEntry) => {
+    setPrompt(entry.prompt)
+    setSettings(entry.settings)
+    setShowHistory(false)
   }
 
   const isRetakeMode = mode === 'retake'
@@ -343,16 +363,63 @@ export function Playground() {
             )}
 
             {/* Prompt Input */}
-            <Textarea
-              label="Prompt"
-              placeholder="Write a prompt..."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              helperText="Longer, detailed prompts lead to better, more accurate results."
-              charCount={prompt.length}
-              maxChars={5000}
-              disabled={isBusy}
-            />
+            <div className="w-full">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[12px] font-semibold text-zinc-500 uppercase leading-4">Prompt</span>
+                <button
+                  onClick={() => setShowHistory(h => !h)}
+                  className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                  title="Prompt & settings history"
+                >
+                  <History size={12} />
+                  History
+                </button>
+              </div>
+
+              {/* History dropdown */}
+              {showHistory && (
+                <div className="mb-2 border border-zinc-700 rounded-lg bg-zinc-900 overflow-hidden">
+                  {historyEntries.length === 0 ? (
+                    <p className="text-xs text-zinc-500 px-3 py-3">No history yet. Successful generations will appear here.</p>
+                  ) : (
+                    <div className="max-h-64 overflow-y-auto divide-y divide-zinc-800">
+                      {historyEntries.map((entry) => (
+                        <div
+                          key={entry.id}
+                          className="flex items-start gap-2 px-3 py-2 hover:bg-zinc-800 cursor-pointer group"
+                          onClick={() => restoreFromHistory(entry)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-zinc-200 truncate">{entry.prompt}</p>
+                            <p className="text-[11px] text-zinc-500 mt-0.5">
+                              {entry.settings.videoResolution} · {entry.settings.duration}s · {entry.settings.fps}fps
+                              {entry.seedUsed != null ? ` · seed ${entry.seedUsed}` : ''}
+                              {' · '}{new Date(entry.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); removeHistory(entry.id); setShowHistory(false); setTimeout(() => setShowHistory(true), 0) }}
+                            className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-zinc-400 transition-opacity flex-shrink-0 mt-0.5"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <Textarea
+                placeholder="Write a prompt..."
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                helperText="Longer, detailed prompts lead to better, more accurate results."
+                charCount={prompt.length}
+                maxChars={5000}
+                disabled={isBusy}
+              />
+            </div>
 
             {/* Settings */}
             {!isRetakeMode && !isIcLoraMode && (
