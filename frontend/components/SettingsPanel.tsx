@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Select } from './ui/select'
 import type { GenerationMode } from './ModeTabs'
 import {
@@ -15,6 +16,7 @@ export interface GenerationSettings {
   audio: boolean
   cameraMotion: string
   aspectRatio?: string
+  seed: number | null  // null = random each generation
   // Image-specific settings
   imageResolution: string
   imageAspectRatio: string
@@ -188,6 +190,11 @@ export function SettingsPanel({
         )}
       </Select>
 
+      {/* Seed */}
+      {!forceApiGenerations && (
+        <SeedRow seed={settings.seed} onChange={(v) => handleChange('seed', v)} disabled={disabled} />
+      )}
+
       {/* Audio and Camera Motion Row */}
       <div className="flex gap-3">
         <div className="w-[140px] flex-shrink-0">
@@ -222,6 +229,81 @@ export function SettingsPanel({
           </Select>
         </div>
       </div>
+    </div>
+  )
+}
+
+function SeedRow({
+  seed,
+  onChange,
+  disabled,
+}: {
+  seed: number | null
+  onChange: (v: number | null) => void
+  disabled?: boolean
+}) {
+  const [inputValue, setInputValue] = useState(seed != null ? String(seed) : '')
+  const isLocked = seed != null
+
+  const randomise = () => {
+    const r = Math.floor(Math.random() * 2_147_483_647)
+    setInputValue(String(r))
+    onChange(r)
+  }
+
+  const handleToggleLock = () => {
+    if (isLocked) {
+      onChange(null)
+      setInputValue('')
+    } else {
+      randomise()
+    }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/[^0-9]/g, '')
+    setInputValue(raw)
+    const n = parseInt(raw, 10)
+    onChange(raw === '' ? null : isNaN(n) ? null : Math.min(n, 2_147_483_647))
+  }
+
+  return (
+    <div>
+      <label className="block text-[12px] font-semibold text-zinc-500 mb-2 uppercase leading-4">Seed</label>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="Random"
+          value={inputValue}
+          onChange={handleInputChange}
+          disabled={disabled}
+          className="flex-1 h-9 rounded-lg border border-zinc-700 bg-zinc-800 px-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        />
+        <button
+          onClick={randomise}
+          disabled={disabled}
+          title="Randomise seed"
+          className="h-9 w-9 flex items-center justify-center rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base"
+        >
+          🎲
+        </button>
+        <button
+          onClick={handleToggleLock}
+          disabled={disabled}
+          title={isLocked ? 'Click to use random seed' : 'Click to lock seed'}
+          className={`h-9 w-9 flex items-center justify-center rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base ${
+            isLocked
+              ? 'border-blue-600 bg-blue-600/20 text-blue-400'
+              : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:text-white hover:border-zinc-500'
+          }`}
+        >
+          {isLocked ? '🔒' : '🔓'}
+        </button>
+      </div>
+      <p className="text-xs text-zinc-500 mt-1">
+        {isLocked ? 'Seed locked — same seed every generation' : 'Random seed each generation'}
+      </p>
     </div>
   )
 }

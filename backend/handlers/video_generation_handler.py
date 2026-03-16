@@ -122,7 +122,7 @@ class VideoGenerationHandler(StateHandlerBase):
             logger.info("Image: %s -> %sx%s", image_path, width, height)
 
         generation_id = self._make_generation_id()
-        seed = self._resolve_seed()
+        seed = self._resolve_seed(req.seed)
 
         try:
             self._pipelines.load_gpu_pipeline("fast", should_warm=False)
@@ -381,7 +381,10 @@ class VideoGenerationHandler(StateHandlerBase):
         n = ((duration * fps) // 8) * 8 + 1
         return max(n, 9)
 
-    def _resolve_seed(self) -> int:
+    def _resolve_seed(self, request_seed: int | None = None) -> int:
+        if request_seed is not None:
+            logger.info("Using request seed: %s", request_seed)
+            return request_seed
         settings = self.state.app_settings
         if settings.seed_locked:
             logger.info("Using locked seed: %s", settings.locked_seed)

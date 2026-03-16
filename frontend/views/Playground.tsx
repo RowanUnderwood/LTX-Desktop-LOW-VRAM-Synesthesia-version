@@ -31,6 +31,7 @@ const DEFAULT_SETTINGS: GenerationSettings = {
   audio: true,
   cameraMotion: 'none',
   aspectRatio: '16:9',
+  seed: null,
   // Image settings
   imageResolution: '1080p',
   imageAspectRatio: '16:9',
@@ -99,6 +100,10 @@ export function Playground() {
         seedUsed: info.seedUsed,
         videoPath: info.videoPath,
       })
+      // Show the actual seed used so user can lock it to repeat the generation
+      if (info.seedUsed != null && info.settings.seed == null) {
+        setSettings(prev => ({ ...prev, seed: info.seedUsed }))
+      }
     },
   })
 

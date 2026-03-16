@@ -159,6 +159,9 @@ export function useGeneration(options: UseGenerationOptions = {}): UseGeneration
         cameraMotion: settings.cameraMotion,
         aspectRatio: settings.aspectRatio || '16:9',
       }
+      if (settings.seed != null) {
+        body.seed = settings.seed
+      }
       if (imagePath) {
         body.imagePath = imagePath
       }
