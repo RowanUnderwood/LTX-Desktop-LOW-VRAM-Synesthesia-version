@@ -27,6 +27,18 @@ logger = logging.getLogger(__name__)
 _BLOCK_SWAP_ATTR = "_block_swap_original_forward"
 
 
+def _move_to_device(obj: Any, device: torch.device) -> Any:
+    """Recursively move tensors in args/kwargs to the target device."""
+    if isinstance(obj, torch.Tensor):
+        return obj.to(device)
+    if isinstance(obj, (list, tuple)):
+        moved = [_move_to_device(x, device) for x in obj]
+        return type(obj)(moved)
+    if isinstance(obj, dict):
+        return {k: _move_to_device(v, device) for k, v in obj.items()}
+    return obj
+
+
 class BlockSwapService:
     """Installs forward-pass hooks on a transformer to swap blocks on/off GPU.
 
@@ -139,13 +151,24 @@ class BlockSwapService:
 
         blocks_on_gpu = self.blocks_on_gpu
         device = self.device
+        total = len(all_blocks)
 
         def swapped_forward(*args: Any, **kwargs: Any) -> Any:
-            # Determine window: keep [idx, idx+blocks_on_gpu) on GPU.
-            # Move blocks entering the window to GPU, evict those leaving.
-            window_end = idx + blocks_on_gpu
+            # Window: keep blocks [idx .. idx+blocks_on_gpu-1] on GPU.
+            window_start = idx
+            window_end = min(idx + blocks_on_gpu, total)
+
+            # Ensure every block in the current window is on GPU.
+            # (On the first block this loads the full initial window;
+            #  on subsequent blocks it incrementally loads the new tail.)
+            for load_idx in range(window_start, window_end):
+                blk = all_blocks[load_idx]
+                if next(blk.parameters(), None) is not None:
+                    if next(blk.parameters()).device.type == "cpu":
+                        blk.to(device)
 
             # Evict the block that just left the window (idx - 1).
+            # It has already finished its forward pass.
             evict_idx = idx - 1
             if evict_idx >= 0:
                 prev = all_blocks[evict_idx]
@@ -153,18 +176,15 @@ class BlockSwapService:
                     if next(prev.parameters()).device.type != "cpu":
                         prev.to("cpu")
 
-            # Load the next block about to enter the window.
-            load_idx = window_end - 1
-            if 0 <= load_idx < len(all_blocks):
-                nxt = all_blocks[load_idx]
-                if next(nxt.parameters(), None) is not None:
-                    if next(nxt.parameters()).device.type == "cpu":
-                        nxt.to(device)
+            # BUG FIX: move input tensors to GPU before calling forward.
+            # block.to(device) moves the weights, but args/kwargs still
+            # hold tensors on CPU (output of the previous evicted block).
+            # PyTorch dispatches ops to the device of the *input tensors*,
+            # not the module — so without this the entire forward runs on
+            # CPU, pinning utilisation at 100% and timing out.
+            args = _move_to_device(args, device)
+            kwargs = _move_to_device(kwargs, device)
 
-            # Ensure this block itself is on GPU.
-            block.to(device)
-
-            # Run the original forward.
             return original_forward(*args, **kwargs)
 
         block.forward = swapped_forward  # type: ignore[method-assign]

@@ -36,11 +36,13 @@ export function createWindow(): BrowserWindow {
   })
 
   // Load the app
-  if (isDev) {
+  // ELECTRON_LOAD_DIST=1 forces loading from built dist/ even when isDev is true
+  const loadFromDist = !isDev || process.env.ELECTRON_LOAD_DIST === '1'
+  if (loadFromDist) {
+    mainWindow.loadFile(path.join(app.getAppPath(), 'dist', 'index.html'))
+  } else {
     mainWindow.loadURL('http://localhost:5173')
     // DevTools can be opened manually with Ctrl+Shift+I or F12
-  } else {
-    mainWindow.loadFile(path.join(app.getAppPath(), 'dist', 'index.html'))
   }
 
   mainWindow.once('ready-to-show', () => {

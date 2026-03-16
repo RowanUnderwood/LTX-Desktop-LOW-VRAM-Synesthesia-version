@@ -131,7 +131,7 @@ class PipelinesHandler(StateHandlerBase):
         transformer_device = self.config.device
         if settings.use_multi_gpu:
             if torch.cuda.is_available() and torch.cuda.device_count() >= 2:
-                transformer_device = torch.device("cuda:1")
+                transformer_device = torch.device("cuda:0")
                 logger.info("Multi-GPU: video/transformer on cuda:0, text encoder on cuda:1")
             else:
                 logger.warning("use_multi_gpu=True but <2 GPUs detected — single GPU mode")

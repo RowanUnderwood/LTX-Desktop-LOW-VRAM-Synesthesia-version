@@ -119,9 +119,15 @@ class LTXTextEncoder:
 
                 _quantize_linear_weights_fp8(te_state.cached_encoder)
 
-                te_state.cached_encoder.to(self.transformer_device)
-                sync_device(self.transformer_device)
-                logger.info("Text encoder loaded onto %s (permanent)", self.transformer_device)
+                if self.transformer_device != self.device:
+                    # Multi-GPU: text encoder lives permanently on the text GPU (cuda:1).
+                    te_state.cached_encoder.to(self.transformer_device)
+                    sync_device(self.transformer_device)
+                    logger.info("Text encoder loaded onto %s (permanent)", self.transformer_device)
+                else:
+                    # Single-GPU: keep on CPU to avoid competing with transformer for VRAM.
+                    # Embeddings are transferred to self.device after encode_text runs.
+                    logger.info("Text encoder loaded to CPU (single-GPU VRAM-safe mode)")
                 return te_state.cached_encoder
 
             def patched_cleanup_memory() -> None:
@@ -200,14 +206,15 @@ class LTXTextEncoder:
                     list[tuple[torch.Tensor, TensorOrNone]],
                     original_encode_text(cast(Any, text_encoder), prompt_list, *args, **kwargs),
                 )
-                if self.transformer_device != self.device:
-                    result = [
-                        (
-                            v.to(self.device),
-                            a.to(self.device) if a is not None else None,
-                        )
-                        for v, a in result
-                    ]
+                # Always move embeddings to video device — handles single-GPU (CPU encoder)
+                # and multi-GPU (cuda:1 encoder) cases.
+                result = [
+                    (
+                        v.to(self.device),
+                        a.to(self.device) if a is not None else None,
+                    )
+                    for v, a in result
+                ]
                 return result
 
             setattr(text_enc_module, "encode_text", patched_encode_text)
