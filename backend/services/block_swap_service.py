@@ -102,16 +102,28 @@ class BlockSwapService:
     # ------------------------------------------------------------------ #
 
     def _get_blocks(self, transformer: nn.Module) -> list[nn.Module]:
-        """Find the transformer block list by trying common attribute names."""
-        for attr in ("transformer_blocks", "blocks", "layers", "model_blocks"):
-            candidate = getattr(transformer, attr, None)
-            if candidate is not None and len(candidate) > 0:
-                return list(candidate)
+        """Find the transformer block list by trying common attribute names.
+
+        LTX model_ledger.transformer() returns X0Model which wraps LTXModel
+        as self.velocity_model — so we traverse one level deeper if needed.
+        """
+        candidates = [transformer]
+        # LTX-specific: X0Model/LegacyX0Model wrap the real model in velocity_model
+        inner = getattr(transformer, "velocity_model", None)
+        if isinstance(inner, nn.Module):
+            candidates.append(inner)
+
+        for module in candidates:
+            for attr in ("transformer_blocks", "blocks", "layers", "model_blocks"):
+                blocks = getattr(module, attr, None)
+                if blocks is not None and len(blocks) > 0:
+                    return list(blocks)
 
         # Fallback: find any ModuleList with >4 children.
-        for _, module in transformer.named_children():
-            if isinstance(module, nn.ModuleList) and len(module) > 4:
-                return list(module)
+        for module in candidates:
+            for _, child in module.named_children():
+                if isinstance(child, nn.ModuleList) and len(child) > 4:
+                    return list(child)
 
         return []
 
