@@ -14,6 +14,7 @@ the text encoder is loaded/offloaded as before.
 
 from __future__ import annotations
 
+import gc
 import logging
 import pickle
 import time
@@ -215,6 +216,19 @@ class LTXTextEncoder:
                     )
                     for v, a in result
                 ]
+
+                # Single-GPU only: optionally unload Gemma from CPU RAM after encoding
+                # to free ~9GB of system RAM before the transformer/VAE runs.
+                # Multi-GPU skips this — the encoder lives on cuda:1, not system RAM.
+                if (
+                    self.transformer_device == self.device
+                    and te_state is not None
+                    and state.app_settings.unload_text_encoder_after_encode
+                ):
+                    te_state.cached_encoder = None
+                    gc.collect()
+                    logger.info("Text encoder unloaded from CPU RAM (low-memory mode)")
+
                 return result
 
             setattr(text_enc_module, "encode_text", patched_encode_text)

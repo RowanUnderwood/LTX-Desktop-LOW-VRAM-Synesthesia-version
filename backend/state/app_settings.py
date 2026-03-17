@@ -89,6 +89,9 @@ class AppSettings(SettingsBaseModel):
     # VAE tiling (0 = use library defaults: 512px spatial, 64 frames temporal)
     vae_spatial_tile_size: int = 0
     vae_temporal_tile_size: int = 0
+    # Free text encoder from CPU RAM after encoding (single-GPU only).
+    # Saves ~9GB system RAM at the cost of ~30s reload on next generation.
+    unload_text_encoder_after_encode: bool = False
 
     @field_validator("block_swap_blocks_on_gpu", mode="before")
     @classmethod
@@ -184,6 +187,7 @@ class SettingsResponse(SettingsBaseModel):
     use_multi_gpu: bool = False
     vae_spatial_tile_size: int = 0
     vae_temporal_tile_size: int = 0
+    unload_text_encoder_after_encode: bool = False
 
 
 def to_settings_response(settings: AppSettings) -> SettingsResponse:

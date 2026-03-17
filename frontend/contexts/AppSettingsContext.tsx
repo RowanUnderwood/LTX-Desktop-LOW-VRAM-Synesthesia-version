@@ -39,6 +39,7 @@ export interface AppSettings {
   civitaiLoras: string
   vaeSpatialTileSize: number
   vaeTemporalTileSize: number
+  unloadTextEncoderAfterEncode: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -68,6 +69,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   civitaiLoras: '[]',
   vaeSpatialTileSize: 0,
   vaeTemporalTileSize: 0,
+  unloadTextEncoderAfterEncode: false,
 }
 
 type BackendProcessStatus = 'alive' | 'restarting' | 'dead'
@@ -127,6 +129,7 @@ function normalizeAppSettings(data: Partial<AppSettings>): AppSettings {
     civitaiLoras: data.civitaiLoras ?? DEFAULT_APP_SETTINGS.civitaiLoras,
     vaeSpatialTileSize: data.vaeSpatialTileSize ?? DEFAULT_APP_SETTINGS.vaeSpatialTileSize,
     vaeTemporalTileSize: data.vaeTemporalTileSize ?? DEFAULT_APP_SETTINGS.vaeTemporalTileSize,
+    unloadTextEncoderAfterEncode: data.unloadTextEncoderAfterEncode ?? DEFAULT_APP_SETTINGS.unloadTextEncoderAfterEncode,
   }
 }
 
