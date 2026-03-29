@@ -68,8 +68,8 @@ echo Keeping existing venv.
 goto :sync_deps
 
 :create_venv
-echo Fetching Python 3.13 (project requires 3.12+)...
-uv python install 3.13
+echo Fetching Python 3.12 (project requires 3.12+)...
+uv python install 3.12
 if errorlevel 1 (
     echo ERROR: Failed to install required Python version.
     pause
